@@ -597,26 +597,23 @@ function compareVersions(left, right) {
   }
   return 0;
 }
-function parseWorkerVersionFromSource(source = "") {
-  const text = String(source || "");
-  const markerMatch = text.match(/EMBY_MATE_VERSION[:=]\s*([0-9]+(?:\.[0-9]+){1,3})/i);
-  if (markerMatch) return normalizeVersionString(markerMatch[1]);
-  const constantMatch = text.match(/WORKER_VERSION(?:_MARKER)?\s*=\s*["'`][^"'`]*?([0-9]+(?:\.[0-9]+){1,3})["'`]/i);
-  if (constantMatch) return normalizeVersionString(constantMatch[1]);
-  const uiMatch = text.match(/版本\s*V([0-9]+(?:\.[0-9]+){1,3})/i);
-  if (uiMatch) return normalizeVersionString(uiMatch[1]);
-  return "";
-}
-function buildGitHubWorkerDistRawUrl(repositoryUrl = GITHUB_REPOSITORY_URL, branch = GITHUB_REPOSITORY_BRANCH, distPath = GITHUB_REPOSITORY_DIST_PATH) {
+function buildGitHubRepositoryRawUrl(pathName = GITHUB_REPOSITORY_VERSION_PATH, repositoryUrl = GITHUB_REPOSITORY_URL, branch = GITHUB_REPOSITORY_BRANCH) {
   const normalizedRepositoryUrl = normalizeRepositoryUrl(repositoryUrl);
   const match = normalizedRepositoryUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/i);
   if (!match) return "";
   const owner = match[1];
   const repo = match[2];
   const normalizedBranch = String(branch || "").trim() || GITHUB_REPOSITORY_BRANCH;
-  const normalizedPath = String(distPath || "").trim().replace(/^\/+/, "");
+  const normalizedPath = String(pathName || "").trim().replace(/^\/+/, "");
   if (!normalizedPath) return "";
   return `https://raw.githubusercontent.com/${owner}/${repo}/${normalizedBranch}/${normalizedPath}`;
+}
+function normalizeVersionManifestRecord(record = {}) {
+  return {
+    version: normalizeVersionString(record.version) || WORKER_VERSION,
+    workerPath: String(record.workerPath || GITHUB_REPOSITORY_WORKER_PATH).trim() || GITHUB_REPOSITORY_WORKER_PATH,
+    updatedAt: String(record.updatedAt || "").trim()
+  };
 }
 function normalizeVersionStatusRecord(record = {}) {
   const currentVersion = normalizeVersionString(record.currentVersion) || WORKER_VERSION;
@@ -628,20 +625,17 @@ function normalizeVersionStatusRecord(record = {}) {
     remoteVersion,
     status,
     checkedAt: String(record.checkedAt || "").trim(),
-    error: String(record.error || "").trim(),
-    repositoryUrl: normalizeRepositoryUrl(record.repositoryUrl) || GITHUB_REPOSITORY_URL,
-    repositoryBranch: String(record.repositoryBranch || "").trim() || GITHUB_REPOSITORY_BRANCH,
-    repositoryDistPath: String(record.repositoryDistPath || "").trim() || GITHUB_REPOSITORY_DIST_PATH,
-    workerVersionMarker: String(record.workerVersionMarker || WORKER_VERSION_MARKER).trim() || WORKER_VERSION_MARKER
+    error: String(record.error || "").trim()
   };
 }
-var WORKER_VERSION, GITHUB_REPOSITORY_URL, GITHUB_REPOSITORY_BRANCH, GITHUB_REPOSITORY_DIST_PATH, WORKER_VERSION_MARKER, VERSION_STATUS_STORAGE_KEY, VERSION_PATTERN;
+var WORKER_VERSION, GITHUB_REPOSITORY_URL, GITHUB_REPOSITORY_BRANCH, GITHUB_REPOSITORY_VERSION_PATH, GITHUB_REPOSITORY_WORKER_PATH, WORKER_VERSION_MARKER, VERSION_STATUS_STORAGE_KEY, VERSION_PATTERN;
 var init_version = __esm({
   "src/app/version.js"() {
     WORKER_VERSION = "2.4.10";
     GITHUB_REPOSITORY_URL = "https://github.com/irm123gard/Emby-Mate";
     GITHUB_REPOSITORY_BRANCH = "main";
-    GITHUB_REPOSITORY_DIST_PATH = "dist/worker.js";
+    GITHUB_REPOSITORY_VERSION_PATH = "version.json";
+    GITHUB_REPOSITORY_WORKER_PATH = "dist/worker.js";
     WORKER_VERSION_MARKER = `EMBY_MATE_VERSION=${WORKER_VERSION}`;
     VERSION_STATUS_STORAGE_KEY = "sys:version-status";
     VERSION_PATTERN = /^\d+(?:\.\d+){0,3}$/;
@@ -2038,10 +2032,10 @@ const sanitizeNodeHeaders=${sanitizeHeaders.toString()};
 const NODE_PATH_PHRASE_MAP=${JSON.stringify(NODE_PATH_PHRASE_MAP)};
 const NODE_PATH_PHRASE_ENTRIES=Object.entries(NODE_PATH_PHRASE_MAP).sort((left,right)=>right[0].length-left[0].length);
 const App={
-    nodes:[],tags:new Set(),tagCandidates:[],nodeNames:new Set(),nodePaths:new Set(),editing:null,editingActiveLineId:'',targetDraft:[],nodeHeadersEnabled:false,nodePathTouched:false,filterText:'',sortMode:'path',config:{theme:'auto',...DEFAULT_SETTINGS_MODAL_CONFIG,redirectWhitelistEntries:[],redirectWhitelistDomains:[],tcping:cloneTcpingConfig(DEFAULT_TCPING_CONFIG),cfMetrics:{...DEFAULT_CF_METRICS_CONFIG}},settingsDraft:createSettingsDraftFromConfig({...DEFAULT_SETTINGS_MODAL_CONFIG,redirectWhitelistEntries:[],redirectWhitelistDomains:[],tcping:cloneTcpingConfig(DEFAULT_TCPING_CONFIG)}),settingsAdvancedOpen:false,cfSettingsDraft:{...DEFAULT_CF_METRICS_CONFIG},proxyDialogNode:null,proxyMode:'custom',activeCardMenu:null,tcpingCache:{},_tcpingRequestsByTarget:{},_tcpingFreshWindowMs:3000,visibleTargets:{},refreshPromise:null,clientRttPromise:null,clientRtt:{loading:false,medianMs:null,error:'',updatedAt:''},_clientRttFreshWindowMs:60000,_filterTimeout:null,_lastFilterSignature:'',cfMetricsData:null,_cfMetricsFreshWindowMs:60000,nodeActivityData:null,nodeActivityRefreshingPath:'',cfAutoRefreshTimer:null,nodeActivityRefreshTimer:null,nodeActivityLoading:false,_nodeActivityFreshWindowMs:60000,_lastNodeActivitySignature:'',configManage:{includeAll:false},modalScrollLocked:false,modalScrollTop:0,versionStatus:{currentVersion:WORKER_VERSION,remoteVersion:'',status:'unknown',checkedAt:'',error:'',repositoryUrl:GITHUB_REPOSITORY_URL},cfDns:{loading:false,hostname:location.hostname||'',zoneName:'',exists:false,mode:'domain',modePinned:false,records:[],status:{kind:'idle',text:'未读取'},domainInput:'',ipInputs:[''],activeIpIndex:0,domainSupport:{checked:false,ipv4:null,ipv6:null,loading:false},domainHistory:[],ipHistory:[],lastError:'',lastMessage:'',lookupTimer:null,lookupSeq:0,fetchSeq:0},
-    normalizeVersionStatus(record={}){const currentVersion=normalizeVersionString(record.currentVersion)||WORKER_VERSION;const remoteVersion=normalizeVersionString(record.remoteVersion);const rawStatus=String(record.status||'').trim().toLowerCase();const status=rawStatus==='update-available'||rawStatus==='equal'||rawStatus==='error'?rawStatus:'unknown';return{currentVersion,remoteVersion,status,checkedAt:String(record.checkedAt||'').trim(),error:String(record.error||'').trim(),repositoryUrl:String(record.repositoryUrl||GITHUB_REPOSITORY_URL).trim()||GITHUB_REPOSITORY_URL};},
+    nodes:[],tags:new Set(),tagCandidates:[],nodeNames:new Set(),nodePaths:new Set(),editing:null,editingActiveLineId:'',targetDraft:[],nodeHeadersEnabled:false,nodePathTouched:false,filterText:'',sortMode:'path',config:{theme:'auto',...DEFAULT_SETTINGS_MODAL_CONFIG,redirectWhitelistEntries:[],redirectWhitelistDomains:[],tcping:cloneTcpingConfig(DEFAULT_TCPING_CONFIG),cfMetrics:{...DEFAULT_CF_METRICS_CONFIG}},settingsDraft:createSettingsDraftFromConfig({...DEFAULT_SETTINGS_MODAL_CONFIG,redirectWhitelistEntries:[],redirectWhitelistDomains:[],tcping:cloneTcpingConfig(DEFAULT_TCPING_CONFIG)}),settingsAdvancedOpen:false,cfSettingsDraft:{...DEFAULT_CF_METRICS_CONFIG},proxyDialogNode:null,proxyMode:'custom',activeCardMenu:null,tcpingCache:{},_tcpingRequestsByTarget:{},_tcpingFreshWindowMs:3000,visibleTargets:{},refreshPromise:null,clientRttPromise:null,clientRtt:{loading:false,medianMs:null,error:'',updatedAt:''},_clientRttFreshWindowMs:60000,_filterTimeout:null,_lastFilterSignature:'',cfMetricsData:null,_cfMetricsFreshWindowMs:60000,nodeActivityData:null,nodeActivityRefreshingPath:'',cfAutoRefreshTimer:null,nodeActivityRefreshTimer:null,nodeActivityLoading:false,_nodeActivityFreshWindowMs:60000,_lastNodeActivitySignature:'',configManage:{includeAll:false},modalScrollLocked:false,modalScrollTop:0,versionStatus:{currentVersion:WORKER_VERSION,remoteVersion:'',status:'unknown',checkedAt:'',error:''},cfDns:{loading:false,hostname:location.hostname||'',zoneName:'',exists:false,mode:'domain',modePinned:false,records:[],status:{kind:'idle',text:'未读取'},domainInput:'',ipInputs:[''],activeIpIndex:0,domainSupport:{checked:false,ipv4:null,ipv6:null,loading:false},domainHistory:[],ipHistory:[],lastError:'',lastMessage:'',lookupTimer:null,lookupSeq:0,fetchSeq:0},
+    normalizeVersionStatus(record={}){const currentVersion=normalizeVersionString(record.currentVersion)||WORKER_VERSION;const remoteVersion=normalizeVersionString(record.remoteVersion);const rawStatus=String(record.status||'').trim().toLowerCase();const status=rawStatus==='update-available'||rawStatus==='equal'||rawStatus==='error'?rawStatus:'unknown';return{currentVersion,remoteVersion,status,checkedAt:String(record.checkedAt||'').trim(),error:String(record.error||'').trim()};},
     syncVersionMenu(){const button=document.getElementById('version-menu-btn');const text=document.getElementById('version-menu-text');if(!button||!text)return;const status=this.normalizeVersionStatus(this.versionStatus);this.versionStatus=status;button.title=status.status==='update-available'&&status.remoteVersion?('当前 '+formatVersionLabel(status.currentVersion)+'，仓库最新 '+formatVersionLabel(status.remoteVersion)):'点击查看 GitHub 仓库';text.textContent=status.status==='update-available'&&status.remoteVersion?('发布新版了：'+formatVersionLabel(status.remoteVersion)):('版本 '+formatVersionLabel(status.currentVersion));},
-    openRepositoryHome(event){event?.preventDefault?.();event?.stopPropagation?.();document.getElementById('main-menu')?.classList.remove('show');window.open((this.versionStatus&&this.versionStatus.repositoryUrl)||GITHUB_REPOSITORY_URL,'_blank','noopener');},
+    openRepositoryHome(event){event?.preventDefault?.();event?.stopPropagation?.();document.getElementById('main-menu')?.classList.remove('show');window.open(GITHUB_REPOSITORY_URL,'_blank','noopener');},
     async loadVersionStatus(force=false){const currentStatus=this.normalizeVersionStatus(this.versionStatus);if(!force&&currentStatus.checkedAt&&currentStatus.status!=='error')return currentStatus;try{const res=await fetch('/admin',{method:'POST',body:JSON.stringify({action:'versionStatus'})});const data=await res.json();if(!res.ok)throw new Error(data.error||'版本信息加载失败');this.versionStatus=this.normalizeVersionStatus(data);}catch(_){this.versionStatus=currentStatus;}this.syncVersionMenu();return this.versionStatus;},
     escapeHtml(str){if(str==null)return'';const map={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};return String(str).replace(/[&<>"']/g,m=>map[m]);},
     quoteJs(str){return JSON.stringify(String(str==null?'':str));},
@@ -10403,10 +10397,10 @@ function handleClientRttProbe() {
 // src/integrations/version-check.js
 init_version();
 async function fetchRemoteWorkerVersion(fetchImpl = fetch) {
-  const rawUrl = buildGitHubWorkerDistRawUrl(
+  const rawUrl = buildGitHubRepositoryRawUrl(
+    GITHUB_REPOSITORY_VERSION_PATH,
     GITHUB_REPOSITORY_URL,
-    GITHUB_REPOSITORY_BRANCH,
-    GITHUB_REPOSITORY_DIST_PATH
+    GITHUB_REPOSITORY_BRANCH
   );
   if (!rawUrl) {
     throw new Error("仓库地址配置无效");
@@ -10421,10 +10415,10 @@ async function fetchRemoteWorkerVersion(fetchImpl = fetch) {
   if (!response.ok) {
     throw new Error(`GitHub 返回异常状态 ${response.status}`);
   }
-  const source = await response.text();
-  const remoteVersion = parseWorkerVersionFromSource(source);
+  const manifest = normalizeVersionManifestRecord(await response.json());
+  const remoteVersion = manifest.version;
   if (!remoteVersion) {
-    throw new Error("未能解析仓库 dist/worker.js 版本");
+    throw new Error("未能解析仓库 version.json 版本");
   }
   return {
     remoteVersion,
@@ -10444,10 +10438,7 @@ async function compareRepositoryWorkerVersion({
       remoteVersion,
       status: comparison < 0 ? "update-available" : "equal",
       checkedAt,
-      error: "",
-      repositoryUrl: GITHUB_REPOSITORY_URL,
-      repositoryBranch: GITHUB_REPOSITORY_BRANCH,
-      repositoryDistPath: GITHUB_REPOSITORY_DIST_PATH
+      error: ""
     });
   } catch (error) {
     return normalizeVersionStatusRecord({
@@ -10455,10 +10446,7 @@ async function compareRepositoryWorkerVersion({
       remoteVersion: "",
       status: "error",
       checkedAt,
-      error: error?.message || "版本检查失败",
-      repositoryUrl: GITHUB_REPOSITORY_URL,
-      repositoryBranch: GITHUB_REPOSITORY_BRANCH,
-      repositoryDistPath: GITHUB_REPOSITORY_DIST_PATH
+      error: error?.message || "版本检查失败"
     });
   }
 }
